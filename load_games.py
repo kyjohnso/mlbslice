@@ -46,4 +46,16 @@ while cur_datetime < end_datetime:
         gamecenter_url = game_url + 'gamecenter.xml'
         try:
             gamecenter_xml = urllib2.urlopen(gamecenter_url).read()
+            gamecenter_root = ET.fromstring(gamecenter_xml)
+            probables_element = gamecenter_root.findall('probables')[0]
+            home_probable_element = probables_element.findall('home')[0]
+            home_prob_id = home_probable_element.findall('player_id')[0].text
+            home_prob_first = home_probable_element.findall('useName')[0].text
+            home_prob_last = home_probable_element.findall('lastName')[0].text
+            
+            away_probable_element = probables_element.findall('away')[0]
+            away_prob_id = home_probable_element.findall('player_id')[0].text
+            away_prob_first = home_probable_element.findall('useName')[0].text
+            away_prob_last = home_probable_element.findall('lastName')[0].text
+
 
