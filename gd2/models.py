@@ -98,14 +98,26 @@ class Game(models.Model):
     start_datetime=models.DateTimeField(null=True)
     type = models.CharField(max_length=2, null=True)
     status = models.CharField(max_length=2, null=True)
-    away_score = models.IntegerField(null=True)
-    home_score = models.IntegerField(null=True)
-    home_probable_id = models.ForeignKey('Player', 
-                                         related_name='home_probable_game_set',
-                                         on_delete=models.DO_NOTHING,)
-    away_probable_id = models.ForeignKey('Player', 
-                                         related_name='away_probable_game_set',
-                                         on_delete=models.DO_NOTHING,)
+    away_team = models.ForeignKey('Team',
+                                  related_name='away_game_set',
+                                  null=True,
+                                  on_delete=models.SET_NULL,)
+    home_team = models.ForeignKey('Team',
+                                  related_name='home_game_set',
+                                  null=True,
+                                  on_delete=models.SET_NULL,)
+    away_runs = models.IntegerField(null=True)
+    home_runs = models.IntegerField(null=True)
+    away_hits = models.IntegerField(null=True)
+    home_hits = models.IntegerField(null=True)
+    home_probable = models.ForeignKey('Player', 
+                                      related_name='home_probable_game_set',
+                                      null=True,
+                                      on_delete=models.SET_NULL,)
+    away_probable = models.ForeignKey('Player', 
+                                      related_name='away_probable_game_set',
+                                      null=True,
+                                      on_delete=models.SET_NULL,)
 
 class Player(models.Model):
     id = models.IntegerField(primary_key=True)
