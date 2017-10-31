@@ -6,6 +6,7 @@ import urllib2
 import datetime
 
 from bs4 import BeautifulSoup
+import xml.etree.ElementTree as ET 
 from django.db.models import Max
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mlbslicedb.settings")
@@ -41,11 +42,12 @@ recent_datetime = recent_datetime_dict['start_datetime__max']
 if recent_datetime:
     start_datetime = recent_datetime - datetime.timedelta(days=1)
 else:
-    start_datetime = datetime.datetime(2007, 3, 1, 0, 0, 0)
+    start_datetime = datetime.datetime(2008, 3, 1, 0, 0, 0)
 cur_datetime = start_datetime
 end_datetime = datetime.datetime.now() + datetime.timedelta(days=1)
 
 while cur_datetime < end_datetime:
+    print 'loading games from ' + cur_datetime.date().isoformat()
     day_url = base_url + 'year_%d/month_%02d/day_%02d/' % (cur_datetime.year,
                                                            cur_datetime.month,
                                                            cur_datetime.day,)
@@ -56,19 +58,19 @@ while cur_datetime < end_datetime:
         game_links = [link.get('href') 
                         for link in day_soup.find_all('a')
                           if link.get('href').find('gid_') >= 0]
-    
     except urllib2.HTTPError:
         game_links = []
         pass
 
     for game_link in game_links:
         game_url = day_url + game_link
+        print 'game url: %s' % game_url
         gamecenter_url = game_url + 'gamecenter.xml'
         game_game_url = game_url + 'game.xml'
         try:
             gamecenter_xml = urllib2.urlopen(gamecenter_url).read()
             gamecenter_root = ET.fromstring(gamecenter_xml)
-            gamecenter_attrib = gamecenter.attrib
+            gamecenter_attrib = gamecenter_root.attrib
             game_id = gamecenter_attrib['id']
             game_status = gamecenter_attrib['status']
             game_type = gamecenter_attrib['type']
@@ -100,24 +102,27 @@ while cur_datetime < end_datetime:
                     pass
 
         except:
-            break
-        
+            print 'error reading game at: %s' % game_url
+            break 
         try:
             game = Game.objects.get(id=game_id)
         except:
             game = Game(id=game_id,)
         
-        home_prob_player = add_player({'id': home_prob_id,
-                                       'first': home_prob_first,
-                                       'last': home_prob_last,})
-        away_prob_player = add_player({'id': away_prob_id,
-                                       'first': away_prob_first,
-                                       'last': away_prob_last,})
+        if home_prob_id:
+            home_prob_player = add_player({'id': int(home_prob_id),
+                                           'first': home_prob_first,
+                                           'last': home_prob_last,})
+            game.home_probable = home_prob_player
+
+        if away_prob_id:
+            away_prob_player = add_player({'id': int(away_prob_id),
+                                           'first': away_prob_first,
+                                           'last': away_prob_last,})
+            game.away_probable = away_prob_player
 
         game.home_team = home_team
         game.away_team = away_team
-        game.home_probable = home_prob_player
-        game.away_probable = away_prob_player
         game.status = game_status
         game.type = game_type
         game.save()
@@ -126,7 +131,7 @@ while cur_datetime < end_datetime:
             box_url = game_url + 'boxscore.xml'
             box_xml = urllib2.urlopen(box_url).read()
             box_root = ET.fromstring(box_xml)
-            box_attrib = box.attrib
+            box_attrib = box_root.attrib
             linescore_element = box_root.findall('linescore')[0]
             linescore_attrib = linescore_element.attrib
             away_runs = linescore_attrib['away_team_runs']
@@ -138,3 +143,5 @@ while cur_datetime < end_datetime:
             game.home_runs = home_runs
             game.home_hits = home_hits 
             game.save()
+
+    cur_datetime += datetime.timedelta(days=1)
