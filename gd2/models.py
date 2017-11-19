@@ -1,9 +1,8 @@
 from __future__ import unicode_literals
-
 from django.db import models
 
 class Pitch(models.Model):
-    atbat_id = models.ForeignKey('Atbat', on_delete=models.DO_NOTHING)
+    atbat = models.ForeignKey('Atbat', on_delete=models.DO_NOTHING)
     description = models.TextField(null=True)
     description_spanish = models.TextField(null=True)
     local_id = models.IntegerField(null=True)
@@ -13,7 +12,7 @@ class Pitch(models.Model):
     x = models.FloatField(null=True)
     y = models.FloatField(null=True)
     event_num = models.IntegerField(null=True)
-    sv_id = models.IntegerField(primary_key=True)
+    sv_id = models.CharField(max_length=16, null=True)
     play_guid = models.CharField(max_length=64, null=True)
     start_speed = models.FloatField(null=True)
     end_speed = models.FloatField(null=True)
@@ -46,7 +45,7 @@ class Pitch(models.Model):
     launch_angle = models.FloatField(null=True)
 
 class Atbat(models.Model):
-    inning_id = models.ForeignKey('Inning',on_delete=models.DO_NOTHING)
+    inning = models.ForeignKey('Inning',on_delete=models.DO_NOTHING)
     num = models.IntegerField(null=True)
     b = models.IntegerField(null=True)
     s = models.IntegerField(null=True)
@@ -56,21 +55,21 @@ class Atbat(models.Model):
     batter = models.ForeignKey('Player', related_name='batter_atbat_set', 
                                 on_delete=models.DO_NOTHING)
     stand = models.CharField(max_length=8, null=True)
-    b_height = models.FloatField(null=True)
+    b_height = models.CharField(max_length=8, null=True)
     pitcher = models.ForeignKey('Player', related_name='pitcher_atbat_set', 
                                 on_delete=models.DO_NOTHING)
     p_throws = models.CharField(max_length=8, null=True)
     description = models.TextField(null=True)
     description_spanish = models.TextField(null=True)
-    event_num = models.IntegerField(null=True)
     event = models.TextField(null=True)
-    event_es = models.TextField(null=True)
+    event_spanish = models.TextField(null=True)
+    event_num = models.IntegerField(null=True)
     play_guid = models.CharField(max_length=64, null=True)
     home_team_runs = models.IntegerField(null=True)
     away_team_runs = models.IntegerField(null=True)
 
 class Action(models.Model):
-    inning_id = models.ForeignKey('Inning', on_delete=models.DO_NOTHING)
+    inning = models.ForeignKey('Inning', on_delete=models.DO_NOTHING)
     b = models.IntegerField(null=True)
     s = models.IntegerField(null=True)
     o = models.IntegerField(null=True)
@@ -82,7 +81,7 @@ class Action(models.Model):
     tfs_zulu = models.DateTimeField(null=True)
 
 class Inning(models.Model):
-    game_id = models.ForeignKey('Game', on_delete=models.DO_NOTHING)
+    game = models.ForeignKey('Game', on_delete=models.DO_NOTHING)
     num = models.IntegerField(null=False)
     top_bottom = models.CharField(max_length=8)
     away_team = models.ForeignKey('Team', 

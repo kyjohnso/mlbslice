@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import os
+import re
 import xml.etree.ElementTree
 import urllib2
 import datetime
@@ -14,6 +15,10 @@ import django
 django.setup()
 
 from gd2.models import Pitch, Atbat, Action, Inning, Game, Player, Team
+
+atbat_fields = set(f.name for f in Atbat._meta.get_fields())
+pitch_fields = set(f.name for f in Pitch._meta.get_fields())
+action_fields = set(f.name for f in Action._meta.get_fields())
 
 def add_team(team_dict):
     try:
@@ -31,7 +36,9 @@ def add_player(player_dict):
         player.first = player_dict['first']
         player.last = player_dict['last']
     except Player.DoesNotExist:
-        player = Player(**player_dict)
+        player = Player(id=player_dict['id'],
+                        first=player_dict['first'],
+                        last=player_dict['last'],)
     player.save()
     return player
 
@@ -42,7 +49,7 @@ recent_datetime = recent_datetime_dict['start_datetime__max']
 if recent_datetime:
     start_datetime = recent_datetime - datetime.timedelta(days=1)
 else:
-    start_datetime = datetime.datetime(2008, 3, 1, 0, 0, 0)
+    start_datetime = datetime.datetime(2011, 3, 1, 0, 0, 0)
 cur_datetime = start_datetime
 end_datetime = datetime.datetime.now() + datetime.timedelta(days=1)
 
@@ -143,5 +150,82 @@ while cur_datetime < end_datetime:
             game.home_runs = home_runs
             game.home_hits = home_hits 
             game.save()
+            
+            players_url = game_url + 'players.xml'
+            players_xml = urllib2.urlopen(players_url).read()
+            players_root = ET.fromstring(players_xml)
+
+            for team_elem in players_root.findall('team'):
+                for player_elem in team_elem.findall('player'):
+                    add_player(player_elem.attrib)                
+
+            innings_url = game_url + 'inning/'
+            innings_html = urllib2.urlopen(innings_url).read()
+            innings_soup = BeautifulSoup(innings_html, 'html.parser')
+            inning_links = [link.get('href') for 
+                                link in innings_soup.find_all('a') 
+                                    if re.search('inning_\d',link.get('href'))]
+
+            for inning_link in inning_links:
+                inning_url = innings_url + inning_link
+                inning_xml = urllib2.urlopen(inning_url).read()
+                inning_root = ET.fromstring(inning_xml)
+
+                for half_elem in inning_root.getchildren():
+                    inning_dict = {'game': Game.objects.get(id=game_id),
+                                   'top_bottom': half_elem.tag,
+                                   'num': int(inning_root.attrib['num']),
+                                   'away_team': away_team,
+                                   'home_team': home_team,
+                                   'next': inning_root.attrib['next'],}
+                    inning = Inning(**inning_dict)
+                    inning.save()
+                    
+                    for event_elem in half_elem.getchildren():
+                        if event_elem.tag.lower() == 'atbat':
+                            atbat_dict = dict(event_elem.items())
+                            atbat_dict['inning'] = inning
+                            atbat_dict['batter'] = Player.objects.get(
+                                                    id=atbat_dict['batter'])
+                            atbat_dict['pitcher'] = Player.objects.get(
+                                                    id=atbat_dict['pitcher'])
+                            atbat_dict['description'] = \
+                                            atbat_dict.pop('des', None)
+                            atbat_dict['description_spanish'] = \
+                                            atbat_dict.pop('des_es', None)
+
+                            atbat_dict = {k: v for k, v in atbat_dict.items()
+                                            if k in atbat_fields}
+                            atbat = Atbat(**atbat_dict)
+                            atbat.save()
+                            
+                            for pitch_elem in event_elem.getchildren():
+                                pitch_dict = dict(pitch_elem.items())
+                                pitch_dict['atbat'] = atbat
+                                pitch_dict['local_id'] = pitch_dict.pop(
+                                                                'id', None)
+                                pitch_dict['description'] = \
+                                                pitch_dict.pop('des', None)
+                                pitch_dict['description_spanish'] = \
+                                                pitch_dict.pop('des_es', None)
+                                pitch_dict = {k: v for k, v in 
+                                                pitch_dict.items() if 
+                                                    k in pitch_fields}
+                                
+                                pitch = Pitch(**pitch_dict)
+                                pitch.save()
+ 
+                        elif event_elem.tag.lower() == 'action':
+                            action_dict = dict(event_elem.items())
+                            action_dict['inning'] = inning
+                            action_dict['description'] = \
+                                            action_dict.pop('des', None)
+                            action_dict['description_spanish'] = \
+                                            action_dict.pop('des_es', None)
+
+                            action_dict = {k: v for k, v in action_dict.items()
+                                            if k in action_fields}
+                            action = Action(**action_dict)
+                            action.save()
 
     cur_datetime += datetime.timedelta(days=1)
