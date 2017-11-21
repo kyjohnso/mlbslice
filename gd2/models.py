@@ -2,7 +2,7 @@ from __future__ import unicode_literals
 from django.db import models
 
 class Pitch(models.Model):
-    atbat = models.ForeignKey('Atbat', on_delete=models.DO_NOTHING)
+    atbat = models.ForeignKey('Atbat', on_delete=models.CASCADE)
     description = models.TextField(null=True)
     description_spanish = models.TextField(null=True)
     local_id = models.IntegerField(null=True)
@@ -44,8 +44,17 @@ class Pitch(models.Model):
     launch_speed = models.FloatField(null=True)
     launch_angle = models.FloatField(null=True)
 
+class Runner(models.Model):
+    atbat = models.ForeignKey('Atbat', on_delete=models.CASCADE)
+    runner = models.ForeignKey('Player', related_name='runner_atbat_set', 
+                                on_delete=models.CASCADE)
+    start = models.CharField(max_length=2, null=True)
+    end = models.CharField(max_length=2, null=True)
+    event = models.CharField(max_length=64, null=True)
+    event_num = models.IntegerField(null=True)
+ 
 class Atbat(models.Model):
-    inning = models.ForeignKey('Inning',on_delete=models.DO_NOTHING)
+    inning = models.ForeignKey('Inning',on_delete=models.CASCADE)
     num = models.IntegerField(null=True)
     b = models.IntegerField(null=True)
     s = models.IntegerField(null=True)
@@ -53,11 +62,11 @@ class Atbat(models.Model):
     start_tfs = models.IntegerField(null=True)
     start_tfs_zulu = models.DateTimeField(null=True)
     batter = models.ForeignKey('Player', related_name='batter_atbat_set', 
-                                on_delete=models.DO_NOTHING)
+                                on_delete=models.CASCADE)
     stand = models.CharField(max_length=8, null=True)
     b_height = models.CharField(max_length=8, null=True)
     pitcher = models.ForeignKey('Player', related_name='pitcher_atbat_set', 
-                                on_delete=models.DO_NOTHING)
+                                on_delete=models.CASCADE)
     p_throws = models.CharField(max_length=8, null=True)
     description = models.TextField(null=True)
     description_spanish = models.TextField(null=True)
@@ -69,7 +78,7 @@ class Atbat(models.Model):
     away_team_runs = models.IntegerField(null=True)
 
 class Action(models.Model):
-    inning = models.ForeignKey('Inning', on_delete=models.DO_NOTHING)
+    inning = models.ForeignKey('Inning', on_delete=models.CASCADE)
     b = models.IntegerField(null=True)
     s = models.IntegerField(null=True)
     o = models.IntegerField(null=True)
@@ -81,15 +90,15 @@ class Action(models.Model):
     tfs_zulu = models.DateTimeField(null=True)
 
 class Inning(models.Model):
-    game = models.ForeignKey('Game', on_delete=models.DO_NOTHING)
+    game = models.ForeignKey('Game', on_delete=models.CASCADE)
     num = models.IntegerField(null=False)
     top_bottom = models.CharField(max_length=8)
     away_team = models.ForeignKey('Team', 
                                   related_name='away_team_inning_set', 
-                                  on_delete=models.DO_NOTHING,)
+                                  on_delete=models.CASCADE,)
     home_team = models.ForeignKey('Team', 
                                   related_name='home_team_inning_set',
-                                  on_delete=models.DO_NOTHING,)
+                                  on_delete=models.CASCADE,)
     next = models.CharField(max_length=2)
 
 class Game(models.Model):
