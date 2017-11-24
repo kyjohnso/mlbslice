@@ -4,9 +4,10 @@ import os
 import re
 import urllib2
 import datetime
-
-from bs4 import BeautifulSoup
 import xml.etree.ElementTree as ET 
+
+from pytz import UTC
+from bs4 import BeautifulSoup
 from django.db import transaction
 from django.db.models import Max
 
@@ -53,48 +54,44 @@ def add_player(player_dict):
 def add_game(game_url):
     gamecenter_url = game_url + 'gamecenter.xml'
     game_game_url = game_url + 'game.xml'
-    try:
-        gamecenter_xml = urllib2.urlopen(gamecenter_url).read()
-        gamecenter_root = ET.fromstring(gamecenter_xml)
-        gamecenter_attrib = gamecenter_root.attrib
-        game_id = gamecenter_attrib['id']
-        game_status = gamecenter_attrib['status']
-        game_type = gamecenter_attrib['type']
-        probables_element = gamecenter_root.findall('probables')[0]
-        home_probable_element = probables_element.findall('home')[0]
-        home_prob_id = home_probable_element.findall('player_id')[0].text
-        home_prob_first = home_probable_element.findall('useName')[0].text
-        home_prob_last = home_probable_element.findall('lastName')[0].text
-        
-        away_probable_element = probables_element.findall('away')[0]
-        away_prob_id = home_probable_element.findall('player_id')[0].text
-        away_prob_first = home_probable_element.findall('useName')[0].text
-        away_prob_last = home_probable_element.findall('lastName')[0].text
+    gamecenter_xml = urllib2.urlopen(gamecenter_url).read()
+    gamecenter_root = ET.fromstring(gamecenter_xml)
+    gamecenter_attrib = gamecenter_root.attrib
+    game_id = gamecenter_attrib['id']
+    game_status = gamecenter_attrib['status']
+    game_type = gamecenter_attrib['type']
+    probables_element = gamecenter_root.findall('probables')[0]
+    home_probable_element = probables_element.findall('home')[0]
+    home_prob_id = home_probable_element.findall('player_id')[0].text
+    home_prob_first = home_probable_element.findall('useName')[0].text
+    home_prob_last = home_probable_element.findall('lastName')[0].text
+    
+    away_probable_element = probables_element.findall('away')[0]
+    away_prob_id = home_probable_element.findall('player_id')[0].text
+    away_prob_first = home_probable_element.findall('useName')[0].text
+    away_prob_last = home_probable_element.findall('lastName')[0].text
 
-        game_game_xml = urllib2.urlopen(game_game_url).read()
-        game_game_root = ET.fromstring(game_game_xml)
-        game_game_attrib = game_game_root.attrib
-        team_elements = game_game_root.findall('team')
-        for team_element in team_elements:
-            team_attrib = team_element.attrib
-            team_dict = {'id': team_attrib['id'],
-                         'name': team_attrib['name'],
-                         'abbrev': team_attrib['abbrev'],}
-            if team_attrib['type'] == 'home':
-                home_team = add_team(team_dict)
-            elif team_attrib['type'] == 'away':
-                away_team = add_team(team_dict)
-            else:
-                pass
+    game_game_xml = urllib2.urlopen(game_game_url).read()
+    game_game_root = ET.fromstring(game_game_xml)
+    game_game_attrib = game_game_root.attrib
+    team_elements = game_game_root.findall('team')
+    for team_element in team_elements:
+        team_attrib = team_element.attrib
+        team_dict = {'id': team_attrib['id'],
+                     'name': team_attrib['name'],
+                     'abbrev': team_attrib['abbrev'],}
+        if team_attrib['type'] == 'home':
+            home_team = add_team(team_dict)
+        elif team_attrib['type'] == 'away':
+            away_team = add_team(team_dict)
+        else:
+            pass
 
-    except:
-        print 'error reading game at: %s' % game_url
-        return 
     try:
         game = Game.objects.get(id=game_id)
         print 'game already exists: %s' % game_id
         return
-    except:
+    except Game.DoesNotExist:
         game = Game(id=game_id,)
     
     if home_prob_id:
@@ -242,7 +239,8 @@ if recent_datetime:
 else:
     start_datetime = datetime.datetime(2011, 3, 1, 0, 0, 0)
 cur_datetime = start_datetime
-end_datetime = datetime.datetime.now() + datetime.timedelta(days=1)
+end_datetime = datetime.datetime.now().replace(tzinfo=UTC) + \
+               datetime.timedelta(days=1)
 
 while cur_datetime < end_datetime:
     print 'loading games from ' + cur_datetime.date().isoformat()
@@ -262,6 +260,10 @@ while cur_datetime < end_datetime:
     for game_link in game_links:
         game_url = day_url + game_link
         print 'game url: %s' % game_url
-        add_game(game_url)
+        try:
+            add_game(game_url)
+        except:
+            print 'error reading game at: %s' % game_url
+            continue 
 
     cur_datetime += datetime.timedelta(days=1)
