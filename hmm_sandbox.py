@@ -28,11 +28,11 @@ def build_toy_dataset(n, p, A, b):
         z += [np.random.multinomial(1, z[-1].dot(A))]
         obs += [np.random.poisson(z[-1].dot(b))]
 
-    return array(obs), array(z)
+    return obs, z
 
 n = 7
-A_true = array([[0.8,0.4],[0.2,0.6]])
 p_true = [.7, .3]
+A_true = array([[0.8,0.4],[0.2,0.6]])
 b_true = [2, 10]
 
 obs_train, z_train = build_toy_dataset(30, p_true, A_true, b_true)
@@ -40,32 +40,36 @@ obs_test, z_test = build_toy_dataset(30, p_true, A_true, b_true)
  
 #obs = tf.placeholder(tf.float32, [n])
 
+
+def gen_hmm(vd):
+    z = tf.expand_dims(
+        tf.transpose(
+        tf.expand_dims(Multinomial(total_count=1., probs=vd['p']), 0)), 0)
+    obs = tf.expand_dims(Poisson(rate=tf.matmul(vd['b'], z[-1])), 0)
+    
+    for t in range(n-1):
+        z_new = tf.transpose(Multinomial(total_count=1.,
+                                probs=tf.transpose(tf.matmul(vd['A'],z[-1]), 
+                                    name='tx_prob')),name='z_new')
+         
+        z = tf.concat([z,tf.expand_dims(z_new,0)],0)
+        obs = tf.concat([obs, 
+                         tf.expand_dims(
+                         Poisson(rate=tf.matmul(vd['b'], z_new)),0)], 0)
+    return obs, z
+
 A_alpha = [[2.,1.],[1.,2.]] # these alpha parameters for the transition
                             #   dirichlet distribution mean the probability
                             #   of staying in the same state is higher than the                             #   probability of transitioning
 
-A = tf.transpose(Dirichlet(A_alpha))
-p = Dirichlet([2.,2.])
-b = tf.expand_dims(Gamma([0.5,2.0], [1.,1.]), 0)
-
-z = tf.expand_dims(
-    tf.transpose(
-    tf.expand_dims(Multinomial(total_count=1., probs=p), 0)), 0)
-obs = tf.expand_dims(Poisson(rate=tf.matmul(b, z[-1])), 0)
-
-for t in range(n-1):
-    z = tf.concat([z,
-                   tf.expand_dims(tf.transpose(
-                                    Multinomial(total_count=1.,
-                                    probs=tf.transpose(tf.matmul(A,z[-1])))
-                                                ),0)],0)
-
-    obs = tf.concat([obs, 
-                     tf.expand_dims(Poisson(rate=tf.matmul(b, z[-1])),0)], 0)
-
-print(sess.run(obs))
- 
-
+A = tf.transpose(Dirichlet(A_alpha, name='A'), name='A_T')
+p = Dirichlet([2.,2.],name='p')
+b = tf.expand_dims(Gamma([0.5,2.0], [1.,1.]), 0, name='b')
     
+obs, z = gen_hmm({'p':p, 'A':A, 'b':b})
+obs_train, z_train = build_toy_dataset(n, p_true, A_true, b_true)
 
+print(sess.run(obs))   
+file_writer = tf.summary.FileWriter('/home/kyjohnso/projects/mlbslice/tb_logs',
+                                    tf.get_default_graph()) 
 
