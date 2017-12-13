@@ -26,17 +26,17 @@ def build_toy_dataset(n, p, A, b):
 
     for step in range(n-1):
         z += [np.random.multinomial(1, z[-1].dot(A))]
-        obs += [np.random.poisson(z[-1].dot(b))]
+        obs += [float(np.random.poisson(z[-1].dot(b)))]
 
     return obs, z
 
 n = 7
 p_true = [.7, .3]
 A_true = array([[0.8,0.4],[0.2,0.6]])
-b_true = [2, 10]
+b_true = [0.1, 2.]
 
-obs_train, z_train = build_toy_dataset(30, p_true, A_true, b_true)
-obs_test, z_test = build_toy_dataset(30, p_true, A_true, b_true)
+obs_train, z_train = build_toy_dataset(n, p_true, A_true, b_true)
+obs_test, z_test = build_toy_dataset(n, p_true, A_true, b_true)
  
 #obs = tf.placeholder(tf.float32, [n])
 
@@ -45,31 +45,63 @@ def gen_hmm(vd):
     z = tf.expand_dims(
         tf.transpose(
         tf.expand_dims(Multinomial(total_count=1., probs=vd['p']), 0)), 0)
-    obs = tf.expand_dims(Poisson(rate=tf.matmul(vd['b'], z[-1])), 0)
+    obs = tf.expand_dims(Poisson(rate=tf.matmul(tf.expand_dims(vd['b'],0), z[-1])), 0)
     
     for t in range(n-1):
         z_new = tf.transpose(Multinomial(total_count=1.,
-                                probs=tf.transpose(tf.matmul(vd['A'],z[-1]), 
+                                probs=tf.transpose(tf.matmul(tf.transpose(vd['A']),z[-1]), 
                                     name='tx_prob')),name='z_new')
          
         z = tf.concat([z,tf.expand_dims(z_new,0)],0)
         obs = tf.concat([obs, 
                          tf.expand_dims(
-                         Poisson(rate=tf.matmul(vd['b'], z_new)),0)], 0)
+                         Poisson(rate=tf.matmul(tf.expand_dims(vd['b'],0), z_new)),0)], 0)
     return obs, z
+p_p_alpha = [2.,2.]
+p_A_alpha = [[2.,1.],[1.,2.]]
+p_b_alpha = [0.5,2.0]
+p_b_beta =  [1.,1.]
 
-A_alpha = [[2.,1.],[1.,2.]] # these alpha parameters for the transition
-                            #   dirichlet distribution mean the probability
-                            #   of staying in the same state is higher than the                             #   probability of transitioning
+q_p_alpha = tf.Variable(p_p_alpha) 
+q_A_alpha = tf.Variable(p_A_alpha)
+q_b_alpha = tf.Variable(p_b_alpha)
+q_b_beta =  tf.Variable(p_b_beta)
 
-A = tf.transpose(Dirichlet(A_alpha, name='A'), name='A_T')
-p = Dirichlet([2.,2.],name='p')
-b = tf.expand_dims(Gamma([0.5,2.0], [1.,1.]), 0, name='b')
+p = Dirichlet(p_p_alpha, name='p')
+A = Dirichlet(p_A_alpha, name='A')
+b = Gamma(p_b_alpha, p_b_beta)
+
+qp = Dirichlet(q_p_alpha, name='p')
+qA = Dirichlet(q_A_alpha, name='A')
+qb = Gamma(q_b_alpha, q_b_beta)
     
 obs, z = gen_hmm({'p':p, 'A':A, 'b':b})
 obs_train, z_train = build_toy_dataset(n, p_true, A_true, b_true)
+obs_train = tf.expand_dims(tf.expand_dims(obs_train, 0), 0)
 
-print(sess.run(obs))   
+latent_vars = {p: qp, A: qA, b: qb}
+data = {tf.squeeze(obs): tf.squeeze(obs_train)}
+
+inference = ed.KLqp(latent_vars, data)
+inference.run(n_iter=2500)
+
+print(qp.eval())
+print(tf.transpose(qA).eval())
+print(qb.eval())
+
+obs_post = ed.copy(obs, {p: qp, A: qA, b: qb})
+print("posterior observations")
+print(tf.squeeze(obs_post).eval())
+print("training observations")
+print(tf.squeeze(obs_train).eval())
+print("Mean absolute error on training data:")
+print(ed.evaluate('mean_absolute_error', data={tf.squeeze(obs_post): tf.squeeze(obs_train)}))
+print("test observations")
+print(tf.squeeze(obs_test).eval())
+print("Mean absolute error on test data:")
+print(ed.evaluate('mean_absolute_error', data={tf.squeeze(obs_post): tf.squeeze(obs_test)}))
+
 file_writer = tf.summary.FileWriter('/home/kyjohnso/projects/mlbslice/tb_logs',
                                     tf.get_default_graph()) 
 
+sess.close()
