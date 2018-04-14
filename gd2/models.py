@@ -60,7 +60,7 @@ class Atbat(models.Model):
     s = models.IntegerField(null=True)
     o = models.IntegerField(null=True)
     start_tfs = models.IntegerField(null=True)
-    start_tfs_zulu = models.DateTimeField(null=True)
+    start_tfs_zulu = models.DateTimeField(null=True, db_index=True)
     batter = models.ForeignKey('Player', related_name='batter_atbat_set', 
                                 on_delete=models.CASCADE)
     stand = models.CharField(max_length=8, null=True)

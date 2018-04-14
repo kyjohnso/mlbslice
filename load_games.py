@@ -244,7 +244,7 @@ end_datetime = datetime.datetime.now().replace(tzinfo=UTC) + \
 
 while cur_datetime < end_datetime:
     print 'loading games from ' + cur_datetime.date().isoformat()
-    day_url = base_url + 'year_%d/month_%02d/day_%02d/' % (cur_datetime.year,
+    day_url = base_url + 'year_%d/month_%02d/day_%02d' % (cur_datetime.year,
                                                            cur_datetime.month,
                                                            cur_datetime.day,)
 
@@ -258,7 +258,7 @@ while cur_datetime < end_datetime:
         game_links = []
 
     for game_link in game_links:
-        game_url = day_url + game_link
+        game_url = day_url + '/' + game_link[game_link.find('/')+1:]
         print 'game url: %s' % game_url
         try:
             add_game(game_url)

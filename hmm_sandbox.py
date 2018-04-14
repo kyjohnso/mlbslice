@@ -30,10 +30,10 @@ def build_toy_dataset(n, p, A, b):
 
     return obs, z
 
-n = 7
+n = 162
 p_true = [.7, .3]
 A_true = array([[0.8,0.4],[0.2,0.6]])
-b_true = [0.1, 2.]
+b_true = [0.1, 3.]
 
 obs_train, z_train = build_toy_dataset(n, p_true, A_true, b_true)
 obs_test, z_test = build_toy_dataset(n, p_true, A_true, b_true)
@@ -45,17 +45,19 @@ def gen_hmm(vd):
     z = tf.expand_dims(
         tf.transpose(
         tf.expand_dims(Multinomial(total_count=1., probs=vd['p']), 0)), 0)
-    obs = tf.expand_dims(Poisson(rate=tf.matmul(tf.expand_dims(vd['b'],0), z[-1])), 0)
+    obs = tf.expand_dims(
+                Poisson(rate=tf.matmul(tf.expand_dims(vd['b'],0), z[-1])), 0)
     
     for t in range(n-1):
         z_new = tf.transpose(Multinomial(total_count=1.,
-                                probs=tf.transpose(tf.matmul(tf.transpose(vd['A']),z[-1]), 
+                    probs=tf.transpose(tf.matmul(tf.transpose(vd['A']),z[-1]), 
                                     name='tx_prob')),name='z_new')
          
         z = tf.concat([z,tf.expand_dims(z_new,0)],0)
         obs = tf.concat([obs, 
                          tf.expand_dims(
-                         Poisson(rate=tf.matmul(tf.expand_dims(vd['b'],0), z_new)),0)], 0)
+                         Poisson(rate=tf.matmul(
+                            tf.expand_dims(vd['b'],0), z_new)),0)], 0)
     return obs, z
 p_p_alpha = [2.,2.]
 p_A_alpha = [[2.,1.],[1.,2.]]
@@ -83,7 +85,7 @@ latent_vars = {p: qp, A: qA, b: qb}
 data = {tf.squeeze(obs): tf.squeeze(obs_train)}
 
 inference = ed.KLqp(latent_vars, data)
-inference.run(n_iter=2500)
+inference.run(n_samples=5, n_iter=2500)
 
 print(qp.eval())
 print(tf.transpose(qA).eval())
