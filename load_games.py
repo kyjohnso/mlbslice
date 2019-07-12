@@ -237,7 +237,7 @@ recent_datetime = recent_datetime_dict['start_datetime__max']
 if recent_datetime:
     start_datetime = recent_datetime - datetime.timedelta(days=1)
 else:
-    start_datetime = datetime.datetime(2011, 3, 1, 0, 0, 0)
+    start_datetime = datetime.datetime(2011, 3, 1, 0, 0, 0).replace(tzinfo=UTC)
 cur_datetime = start_datetime
 end_datetime = datetime.datetime.now().replace(tzinfo=UTC) + \
                datetime.timedelta(days=1)
